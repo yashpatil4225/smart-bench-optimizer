@@ -11,37 +11,32 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Professional Styling (Card Font & Contrast Fixed) ---
+# --- Professional Styling ---
 st.markdown("""
 <style>
     /* Metric Card Styling */
-    div[data-testid="stMetric"] {
+    .metric-card {
         background-color: #111827;
         border: 1px solid #374151;
-        padding: 14px 18px;
+        padding: 16px 20px;
         border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
         text-align: center;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        margin-bottom: 15px;
     }
-    
-    /* Metric Label (Title वरचा मजकूर स्पष्ट आणि पांढरा/फिकट निळा दिसेल) */
-    div[data-testid="stMetricLabel"] > div {
-        font-size: 0.90rem !important;
-        font-weight: 700 !important;
-        color: #e5e7eb !important; /* High contrast light grey/white */
+    .metric-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #ffffff !important; /* Pure Crisp White */
         text-transform: uppercase;
-        letter-spacing: 0.04em;
-        white-space: normal !important; /* कापला जाणार नाही, नवीन लाईनवर येईल */
-        overflow: visible !important;
-        line-height: 1.3 !important;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
     }
-    
-    /* Metric Value (20, 13, 65% मोठे आणि स्पष्ट दिसतील) */
-    div[data-testid="stMetricValue"] > div {
-        font-size: 1.85rem !important;
-        font-weight: 800 !important;
-        color: #60a5fa !important; /* Bright crisp blue */
-        white-space: nowrap !important;
+    .metric-number {
+        font-size: 2.2rem;
+        font-weight: 800;
+        color: #60a5fa !important; /* Bright Blue */
+        line-height: 1.1;
     }
     
     /* Top Banner Card */
@@ -123,11 +118,36 @@ st.markdown("""
 
 bench = df[df["status"] == "Bench"].copy()
 
-# Key Metric Cards (Text Clear & Contrast Fixed)
+# High-Contrast Custom Metric Cards (Pure White & Bright Blue)
 m1, m2, m3 = st.columns(3)
-m1.metric("Total Headcount", len(df))
-m2.metric("Available on Bench", len(bench))
-m3.metric("Bench Ratio", f"{(len(bench) / len(df) * 100):.1f}%" if len(df) > 0 else "0%")
+
+total_count = len(df)
+bench_count = len(bench)
+bench_ratio = f"{(bench_count / total_count * 100):.1f}%" if total_count > 0 else "0%"
+
+with m1:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-title">Total Headcount</div>
+        <div class="metric-number">{total_count}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with m2:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-title">Available on Bench</div>
+        <div class="metric-number">{bench_count}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with m3:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-title">Bench Ratio</div>
+        <div class="metric-number">{bench_ratio}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Expander for Bench Roster
 with st.expander("View Active Bench Roster", expanded=False):
