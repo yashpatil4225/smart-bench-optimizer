@@ -1,313 +1,297 @@
-import streamlit as st
+import io
+import os
+
 import pandas as pd
+import streamlit as st
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import io
 
-# --- Page Configuration ---
+# ---------------------------------------------------------------
+# Page config
+# ---------------------------------------------------------------
 st.set_page_config(
-    page_title="SmartBench AI | Enterprise Resource Optimizer",
-    page_icon="💼",
+    page_title="Smart Bench Optimizer",
+    page_icon="🎯",
     layout="wide",
-    initial_sidebar_state="expanded"
 )
 
-# --- Universal Clean SaaS Styling (High-Contrast & Clean Cards) ---
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
+# ---------------------------------------------------------------
+# Premium styling
+# ---------------------------------------------------------------
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+
+    .stApp {
+        background: radial-gradient(1200px 600px at 10% -10%, #1e1b4b 0%, transparent 60%),
+                    radial-gradient(900px 500px at 100% 0%, #0c4a6e 0%, transparent 55%),
+                    #0b1020;
+        color: #e5e7eb;
     }
+    #MainMenu, footer, header { visibility: hidden; }
+    .block-container { padding-top: 2rem; max-width: 1200px; }
 
-    #MainMenu, footer, header {visibility: hidden;}
+    /* Hero */
+    .hero {
+        padding: 2rem 2.2rem;
+        border-radius: 20px;
+        background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(14,165,233,0.18));
+        border: 1px solid rgba(255,255,255,0.10);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+        margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+        margin: 0; font-size: 2.2rem; font-weight: 800;
+        background: linear-gradient(90deg, #a5b4fc, #67e8f9);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero p { margin: .5rem 0 0 0; color: #cbd5e1; font-size: 1.02rem; }
 
-    /* Professional Top Banner */
-    .hero-banner {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        border: 1px solid #334155;
-        padding: 24px 30px;
+    /* Metric cards */
+    .card {
+        padding: 1.1rem 1.3rem;
+        border-radius: 16px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.09);
+        backdrop-filter: blur(8px);
+    }
+    .card .label { font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; }
+    .card .value { font-size: 1.9rem; font-weight: 700; color: #f8fafc; margin-top: .15rem; }
+    .card .sub { font-size: .8rem; color: #67e8f9; }
+
+    /* Section titles */
+    .section-title { font-size: 1.15rem; font-weight: 700; margin: 1.6rem 0 .7rem 0; color: #f1f5f9; }
+
+    /* Inputs */
+    .stTextArea textarea {
+        background: rgba(255,255,255,0.06) !important;
+        border: 1px solid rgba(255,255,255,0.14) !important;
+        border-radius: 14px !important;
+        color: #f8fafc !important;
+    }
+    .stTextArea textarea:focus { border-color: #818cf8 !important; box-shadow: 0 0 0 2px rgba(129,140,248,.35) !important; }
+
+    /* Buttons */
+    .stButton > button {
+        width: 100%;
+        border: none; border-radius: 14px;
+        padding: .8rem 1rem; font-weight: 700; font-size: 1rem;
+        color: white;
+        background: linear-gradient(90deg, #6366f1, #0ea5e9);
+        box-shadow: 0 10px 25px rgba(99,102,241,.35);
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .stButton > button:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(14,165,233,.45); color: white; }
+
+    .stDownloadButton > button {
+        width: 100%;
         border-radius: 12px;
-        margin-bottom: 24px;
-        color: #ffffff;
+        border: 1px solid rgba(255,255,255,0.18);
+        background: rgba(255,255,255,0.06);
+        color: #e2e8f0; font-weight: 600;
     }
-    .hero-banner h1 {
-        margin: 0;
-        font-size: 1.7rem;
-        font-weight: 700;
-        color: #ffffff;
-    }
-    .hero-banner p {
-        margin-top: 6px;
-        margin-bottom: 0;
-        color: #94a3b8;
-        font-size: 0.95rem;
+    .stDownloadButton > button:hover { border-color: #67e8f9; color: #67e8f9; }
+
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background: rgba(10,14,30,0.95);
+        border-right: 1px solid rgba(255,255,255,0.08);
     }
 
-    /* Metric Cards - 100% High Contrast */
-    .metric-card {
-        background-color: #0f172a;
-        border: 1px solid #334155;
-        padding: 18px 20px;
-        border-radius: 10px;
-        text-align: center;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-    }
-    .metric-title {
-        font-size: 0.82rem;
-        font-weight: 700;
-        color: #f1f5f9 !important; /* Pure Bright White */
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-bottom: 6px;
-    }
-    .metric-number {
-        font-size: 2.2rem;
-        font-weight: 800;
-        color: #38bdf8 !important; /* Bright Neon Blue */
-        line-height: 1.1;
-    }
-    .metric-sub {
-        font-size: 0.75rem;
-        color: #94a3b8;
-        margin-top: 5px;
-    }
+    /* Dataframe */
+    div[data-testid="stDataFrame"] { border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.09); }
 
-    /* Force Sidebar Input Labels to be High Contrast & Readable */
-    section[data-testid="stSidebar"] label,
-    section[data-testid="stSidebar"] label p,
-    div[data-testid="stForm"] label,
-    div[data-testid="stForm"] label p {
-        color: #ffffff !important;
-        font-weight: 700 !important;
-        font-size: 0.90rem !important;
-    }
+    .footer-note { text-align:center; color:#64748b; font-size:.8rem; margin-top:2.5rem; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-    /* Candidate Detail Card */
-    .candidate-card {
-        background: #0f172a;
-        border: 1px solid #334155;
-        border-radius: 10px;
-        padding: 16px 20px;
-        margin-bottom: 12px;
-    }
-    .candidate-name {
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #ffffff;
-    }
-    .candidate-exp {
-        font-size: 0.85rem;
-        color: #38bdf8;
-        font-weight: 600;
-    }
-    .candidate-skills {
-        font-size: 0.9rem;
-        color: #cbd5e1;
-        margin: 6px 0;
-    }
-</style>
-""", unsafe_allow_html=True)
 
-CSV_FILE = "employees.csv"
+# ---------------------------------------------------------------
+# Data
+# ---------------------------------------------------------------
+@st.cache_data
+def load_data() -> pd.DataFrame:
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "employees.csv")
+    return pd.read_csv(path)
 
-# ==================== DATA SESSION HANDLING ====================
-if "df" not in st.session_state:
-    try:
-        st.session_state.df = pd.read_csv(CSV_FILE)
-    except Exception:
-        st.session_state.df = pd.DataFrame(columns=["employee_name", "skills_profile", "experience_years", "status"])
 
-df = st.session_state.df
-
-# ==================== SIDEBAR ====================
-with st.sidebar:
-    st.markdown("## ⬡ SmartBench AI")
-    st.caption("Enterprise Resource Allocation Engine")
-    st.markdown("---")
-    
-    st.subheader("Resource Onboarding")
-    with st.form(key="add_employee_form", clear_on_submit=True):
-        new_name = st.text_input("Full Name", placeholder="e.g. Alex Johnson")
-        new_skills = st.text_area("Skills Profile (Comma-separated)", placeholder="e.g. Python, SQL, Docker, AWS", height=80)
-        new_exp = st.number_input("Experience (Years)", min_value=0.0, max_value=30.0, value=3.0, step=0.5)
-        new_status = st.selectbox("Current Status", ["Bench", "Allocated"])
-        
-        submitted = st.form_submit_button("Add Resource to Inventory", use_container_width=True, type="primary")
-        
-        if submitted:
-            if not new_name.strip() or not new_skills.strip():
-                st.error("Please provide both Name and Skills.")
-            else:
-                new_entry = pd.DataFrame([{
-                    "employee_name": new_name.strip(),
-                    "skills_profile": new_skills.strip(),
-                    "experience_years": float(new_exp),
-                    "status": new_status
-                }])
-                st.session_state.df = pd.concat([st.session_state.df, new_entry], ignore_index=True)
-                try:
-                    new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
-                except Exception:
-                    pass
-                st.success(f"Added {new_name} successfully!")
-                st.rerun()
-
-    st.markdown("---")
-    st.subheader("Algorithm Calibration")
-    skill_weight = st.slider("Skill Match Weight", min_value=0.1, max_value=0.9, value=0.7, step=0.05)
-    exp_weight = round(1.0 - skill_weight, 2)
-    st.caption(f"Score Formula: **{int(skill_weight*100)}% Skills** + **{int(exp_weight*100)}% Experience**")
-
-# ==================== MAIN PANEL ====================
-st.markdown("""
-<div class="hero-banner">
-    <h1>SmartBench Resource Allocation Optimizer</h1>
-    <p>Semantic NLP Talent Matching Engine powered by TF-IDF vectorization and cosine similarity scoring.</p>
-</div>
-""", unsafe_allow_html=True)
-
+df = load_data()
 bench = df[df["status"] == "Bench"].copy()
 
-# High-Contrast Metric Cards
-total_count = len(df)
-bench_count = len(bench)
-bench_ratio = f"{(bench_count / total_count * 100):.1f}%" if total_count > 0 else "0.0%"
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-title">Total Headcount</div>
-        <div class="metric-number">{total_count}</div>
-        <div class="metric-sub">Total Managed Talent</div>
-    </div>
-    """, unsafe_allow_html=True)
+# ---------------------------------------------------------------
+# Matching logic (TF-IDF + cosine similarity + hybrid score)
+# ---------------------------------------------------------------
+def rank_employees(bench_df, project_text, required_exp, skill_w, exp_w):
+    ranked = bench_df.copy()
+    vectorizer = TfidfVectorizer()
+    all_text = list(ranked["skills_profile"]) + [project_text]
+    matrix = vectorizer.fit_transform(all_text)
+    ranked["Skill_Score"] = cosine_similarity(matrix[-1], matrix[:-1]).flatten()
+    ranked["Experience_Score"] = (ranked["experience_years"] / required_exp).clip(upper=1.0)
+    ranked["Final_Score"] = skill_w * ranked["Skill_Score"] + exp_w * ranked["Experience_Score"]
+    ranked = ranked.sort_values("Final_Score", ascending=False).head(5).reset_index(drop=True)
+    ranked.insert(0, "Rank", ranked.index + 1)
+    return ranked
 
-with col2:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-title">Available on Bench</div>
-        <div class="metric-number">{bench_count}</div>
-        <div class="metric-sub">Ready for Projects</div>
-    </div>
-    """, unsafe_allow_html=True)
 
-with col3:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-title">Bench Utilization Ratio</div>
-        <div class="metric-number" style="color: #a855f7;">{bench_ratio}</div>
-        <div class="metric-sub">Optimization Target</div>
-    </div>
-    """, unsafe_allow_html=True)
+def to_excel_bytes(frame: pd.DataFrame) -> bytes:
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        frame.to_excel(writer, index=False, sheet_name="Top Matches")
+        sheet = writer.sheets["Top Matches"]
+        for col in sheet.columns:
+            width = max(len(str(cell.value)) if cell.value is not None else 0 for cell in col)
+            sheet.column_dimensions[col[0].column_letter].width = min(width + 3, 60)
+    return buffer.getvalue()
 
-st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
-# Active Bench Roster Table
-with st.expander("📋 View Complete Active Bench Roster", expanded=False):
-    st.dataframe(
-        bench[["employee_name", "skills_profile", "experience_years"]].rename(columns={
-            "employee_name": "Employee Name",
-            "skills_profile": "Skills Profile",
-            "experience_years": "Experience (Years)"
-        }),
-        use_container_width=True,
-        hide_index=True
+# ---------------------------------------------------------------
+# Sidebar (settings)
+# ---------------------------------------------------------------
+with st.sidebar:
+    st.markdown("### ⚙️ Settings")
+    required_experience = st.slider("Required experience (years)", 1, 10, 4)
+    skill_pct = st.slider("Skill weight (%)", 0, 100, 70, step=5)
+    exp_pct = 100 - skill_pct
+    st.caption(f"Skill **{skill_pct}%**  +  Experience **{exp_pct}%**")
+    st.markdown("---")
+    st.caption(
+        "Skills are converted with TF-IDF, compared using cosine similarity, "
+        "then combined with experience into a final score."
     )
 
-st.markdown("---")
+# ---------------------------------------------------------------
+# Hero
+# ---------------------------------------------------------------
+st.markdown(
+    """
+    <div class="hero">
+        <h1>🎯 IT Smart-Bench &amp; Resource Allocation Optimizer</h1>
+        <p>Describe your project and instantly find the best available employees from the bench.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-# ==================== NLP MATCHING ENGINE ====================
-st.subheader("Semantic Matching Studio")
-st.caption("Enter requirements to match candidate capabilities mathematically.")
-
-query_col, filter_col = st.columns([3, 1])
-
-with query_col:
-    project_description = st.text_area(
-        "Project Requirements / Scope",
-        placeholder="e.g. Looking for a Python backend developer experienced with FastAPI, PostgreSQL, Docker, and AWS microservices.",
-        height=100
+# ---------------------------------------------------------------
+# Stat cards
+# ---------------------------------------------------------------
+c1, c2, c3 = st.columns(3)
+with c1:
+    st.markdown(
+        f'<div class="card"><div class="label">Employees on bench</div>'
+        f'<div class="value">{len(bench)}</div><div class="sub">available now</div></div>',
+        unsafe_allow_html=True,
+    )
+with c2:
+    st.markdown(
+        f'<div class="card"><div class="label">Total employees</div>'
+        f'<div class="value">{len(df)}</div><div class="sub">in database</div></div>',
+        unsafe_allow_html=True,
+    )
+with c3:
+    avg_exp = bench["experience_years"].mean() if len(bench) else 0
+    st.markdown(
+        f'<div class="card"><div class="label">Avg bench experience</div>'
+        f'<div class="value">{avg_exp:.1f} yrs</div><div class="sub">across bench</div></div>',
+        unsafe_allow_html=True,
     )
 
-with filter_col:
-    required_experience = st.slider("Target Experience (Yrs)", min_value=1, max_value=15, value=4)
-    top_n = st.selectbox("Max Recommendations", [3, 5, 8], index=1)
+# ---------------------------------------------------------------
+# Input
+# ---------------------------------------------------------------
+st.markdown('<div class="section-title">📝 Project requirement</div>', unsafe_allow_html=True)
+project_description = st.text_area(
+    "Project description",
+    placeholder="e.g. Need a python developer with machine learning and sql knowledge",
+    height=120,
+    label_visibility="collapsed",
+)
 
-if st.button("Find Matching Resources", type="primary", use_container_width=True):
+if st.button("🔍 Find Available Resources"):
     if not project_description.strip():
-        st.warning("Please enter project requirements first.")
-    elif len(bench) == 0:
-        st.error("No resources currently available on the bench.")
+        st.warning("Please enter a project description.")
+        st.session_state.pop("result", None)
+    elif bench.empty:
+        st.info("No employees are currently on the bench.")
+        st.session_state.pop("result", None)
     else:
-        with st.spinner("Calculating semantic similarity..."):
-            # TF-IDF Matching
-            vectorizer = TfidfVectorizer(stop_words='english')
-            corpus = list(bench["skills_profile"]) + [project_description]
-            tfidf_matrix = vectorizer.fit_transform(corpus)
-            
-            # Compute Cosine Scores
-            bench["Skill_Match"] = cosine_similarity(tfidf_matrix[-1], tfidf_matrix[:-1]).flatten()
-            bench["Experience_Score"] = (bench["experience_years"] / required_experience).clip(upper=1.0)
-            bench["Composite_Score"] = (skill_weight * bench["Skill_Match"]) + (exp_weight * bench["Experience_Score"])
-            
-            results = bench.sort_values(by="Composite_Score", ascending=False).head(top_n).copy()
-            
-            st.markdown("### Top Recommended Candidates")
-            
-            # Interactive Visual Progress Cards
-            for _, row in results.iterrows():
-                fit_score = int(round(row["Composite_Score"] * 100))
-                skill_score = int(round(row["Skill_Match"] * 100))
-                
-                st.markdown(f"""
-                <div class="candidate-card">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span class="candidate-name">{row['employee_name']}</span>
-                        <span class="candidate-exp">{row['experience_years']} Years Exp</span>
-                    </div>
-                    <div class="candidate-skills"><strong>Skills:</strong> {row['skills_profile']}</div>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #94a3b8; margin-top: 6px;">
-                        <span>Overall Suitability: <strong style="color: #38bdf8;">{fit_score}%</strong> (Skill Match: {skill_score}%)</span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                st.progress(fit_score / 100)
-            
-            st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
-            
-            # Formatted Clean Table
-            export_df = results[["employee_name", "skills_profile", "experience_years", "Composite_Score"]].copy()
-            export_df["Overall Fit (%)"] = (export_df["Composite_Score"] * 100).round(1).astype(str) + "%"
-            clean_table = export_df[["employee_name", "skills_profile", "experience_years", "Overall Fit (%)"]].rename(columns={
-                "employee_name": "Employee Name",
-                "skills_profile": "Skills Profile",
-                "experience_years": "Experience (Years)"
-            })
-            
-            st.dataframe(clean_table, use_container_width=True, hide_index=True)
-            
-            # ==================== CLEAN EXPORT ====================
-            st.markdown("#### Export Allocation Report")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.download_button(
-                    label="📥 Download CSV Report",
-                    data=clean_table.to_csv(index=False).encode('utf-8'),
-                    file_name="SmartBench_Allocation.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-            with c2:
-                buffer = io.BytesIO()
-                with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                    clean_table.to_excel(writer, index=False, sheet_name='Allocations')
-                st.download_button(
-                    label="📊 Download Excel Spreadsheet (.xlsx)",
-                    data=buffer.getvalue(),
-                    file_name="SmartBench_Allocation.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
+        st.session_state["result"] = rank_employees(
+            bench,
+            project_description,
+            required_experience,
+            skill_pct / 100,
+            exp_pct / 100,
+        )
+
+# ---------------------------------------------------------------
+# Results (kept in session_state so downloads don't clear them)
+# ---------------------------------------------------------------
+if "result" in st.session_state:
+    result = st.session_state["result"]
+
+    st.markdown('<div class="section-title">🏆 Top Matched Employees</div>', unsafe_allow_html=True)
+
+    best = result.iloc[0]
+    b1, b2, b3 = st.columns(3)
+    b1.metric("Best match", best["employee_name"])
+    b2.metric("Final score", f"{best['Final_Score']:.2f}")
+    b3.metric("Experience", f"{int(best['experience_years'])} yrs")
+
+    display = result[
+        ["Rank", "employee_name", "skills_profile", "experience_years",
+         "Skill_Score", "Experience_Score", "Final_Score"]
+    ].rename(
+        columns={
+            "employee_name": "Employee",
+            "skills_profile": "Skills",
+            "experience_years": "Experience (yrs)",
+            "Skill_Score": "Skill Score",
+            "Experience_Score": "Experience Score",
+            "Final_Score": "Final Score",
+        }
+    )
+
+    st.dataframe(
+        display,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Skill Score": st.column_config.ProgressColumn("Skill Score", min_value=0.0, max_value=1.0, format="%.2f"),
+            "Experience Score": st.column_config.ProgressColumn("Experience Score", min_value=0.0, max_value=1.0, format="%.2f"),
+            "Final Score": st.column_config.ProgressColumn("Final Score", min_value=0.0, max_value=1.0, format="%.2f"),
+        },
+    )
+
+    # Export
+    st.markdown('<div class="section-title">📥 Export results</div>', unsafe_allow_html=True)
+    export_frame = display.copy()
+    for col in ["Skill Score", "Experience Score", "Final Score"]:
+        export_frame[col] = export_frame[col].round(3)
+
+    d1, d2 = st.columns(2)
+    with d1:
+        st.download_button(
+            "⬇️ Download CSV",
+            data=export_frame.to_csv(index=False).encode("utf-8"),
+            file_name="top_bench_matches.csv",
+            mime="text/csv",
+        )
+    with d2:
+        st.download_button(
+            "⬇️ Download Excel",
+            data=to_excel_bytes(export_frame),
+            file_name="top_bench_matches.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+st.markdown(
+    '<div class="footer-note">Built with Python · Pandas · Scikit-learn · Streamlit</div>',
+    unsafe_allow_html=True,
+)
