@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from collections import Counter
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -14,7 +16,6 @@ st.set_page_config(
 # --- Professional Styling ---
 st.markdown("""
 <style>
-    /* Metric Card Styling */
     .metric-card {
         background-color: #111827;
         border: 1px solid #374151;
@@ -22,24 +23,22 @@ st.markdown("""
         border-radius: 12px;
         text-align: center;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        margin-bottom: 15px;
+        margin-bottom: 12px;
     }
     .metric-title {
         font-size: 0.95rem;
         font-weight: 700;
-        color: #ffffff !important; /* Pure Crisp White */
+        color: #ffffff !important;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }
     .metric-number {
         font-size: 2.2rem;
         font-weight: 800;
-        color: #60a5fa !important; /* Bright Blue */
+        color: #60a5fa !important;
         line-height: 1.1;
     }
-    
-    /* Top Banner Card */
     .hero-banner {
         background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
         padding: 24px;
@@ -69,10 +68,10 @@ def load_data():
 
 df = load_data()
 
-# ==================== SIDEBAR: RECRUITMENT / ONBOARDING ====================
+# ==================== SIDEBAR ====================
 with st.sidebar:
     st.markdown("### Resource Onboarding")
-    st.caption("Add a newly inducted or unassigned engineer to the inventory.")
+    st.caption("Add an unassigned or new engineer to the inventory.")
     
     with st.form(key="add_employee_form", clear_on_submit=True):
         new_name = st.text_input("Full Name", placeholder="e.g. Alex Johnson")
@@ -102,11 +101,16 @@ with st.sidebar:
                     "status": new_status
                 }])
                 new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
-                st.success(f"Success: Added '{new_name}' to inventory.")
+                st.success(f"Added '{new_name}' to inventory.")
                 st.rerun()
 
     st.divider()
-    st.caption("SmartBench Optimizer Engine v2.4 | Enterprise Edition")
+    # Feature 4: Hyperparameter Weights Control in Sidebar
+    st.markdown("### Model Weight Calibration")
+    st.caption("Tune the composite scoring function balance:")
+    skill_weight = st.slider("Skill Match Weight", min_value=0.1, max_value=0.9, value=0.7, step=0.05)
+    exp_weight = round(1.0 - skill_weight, 2)
+    st.info(f"Formula: **{int(skill_weight*100)}% Skill** + **{int(exp_weight*100)}% Experience**")
 
 # ==================== MAIN DASHBOARD ====================
 st.markdown("""
@@ -118,9 +122,8 @@ st.markdown("""
 
 bench = df[df["status"] == "Bench"].copy()
 
-# High-Contrast Custom Metric Cards (Pure White & Bright Blue)
+# Metric Cards
 m1, m2, m3 = st.columns(3)
-
 total_count = len(df)
 bench_count = len(bench)
 bench_ratio = f"{(bench_count / total_count * 100):.1f}%" if total_count > 0 else "0%"
@@ -149,7 +152,43 @@ with m3:
     </div>
     """, unsafe_allow_html=True)
 
-# Expander for Bench Roster
+# ==================== FEATURE 2: VISUAL ANALYTICS ====================
+with st.expander("Bench Talent Analytics & Skill Distribution", expanded=False):
+    chart_col1, chart_col2 = st.columns(2)
+    
+    # 1. Top Skills Chart
+    all_skills_list = []
+    for s in bench["skills_profile"].dropna():
+        items = [x.strip().title() for x in str(s).split(",") if x.strip()]
+        all_skills_list.extend(items)
+    
+    skill_counts = Counter(all_skills_list).most_common(8)
+    if skill_counts:
+        skills_df = pd.DataFrame(skill_counts, columns=["Skill", "Count"])
+        fig_bar = px.bar(
+            skills_df, 
+            x="Count", 
+            y="Skill", 
+            orientation="h",
+            title="Top Available Skills on Bench",
+            color="Count",
+            color_continuous_scale="Blues"
+        )
+        fig_bar.update_layout(yaxis=dict(autorange="reversed"), height=300, margin=dict(l=20, r=20, t=40, b=20))
+        chart_col1.plotly_chart(fig_bar, use_container_width=True)
+
+    # 2. Experience Distribution Chart
+    fig_hist = px.histogram(
+        bench, 
+        x="experience_years", 
+        nbins=6, 
+        title="Experience Distribution (Years)",
+        color_discrete_sequence=["#3b82f6"]
+    )
+    fig_hist.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20), xaxis_title="Years", yaxis_title="Count")
+    chart_col2.plotly_chart(fig_hist, use_container_width=True)
+
+# Active Roster Table
 with st.expander("View Active Bench Roster", expanded=False):
     st.dataframe(
         bench[["employee_name", "skills_profile", "experience_years"]].rename(columns={
@@ -180,6 +219,7 @@ with filter_col:
     required_experience = st.slider("Target Experience (Yrs)", min_value=1, max_value=15, value=4)
     top_n = st.selectbox("Max Recommendations", [3, 5, 10], index=1)
 
+# Matching Execution
 if st.button("Find Matching Resources", type="primary", use_container_width=True):
     if not project_description.strip():
         st.warning("Please supply project requirements to calculate semantic similarity.")
@@ -194,8 +234,11 @@ if st.button("Find Matching Resources", type="primary", use_container_width=True
             similarity_scores = cosine_similarity(tfidf_matrix[-1], tfidf_matrix[:-1]).flatten()
             bench["Skill_Match"] = similarity_scores
             
+            # Experience scoring function
             bench["Experience_Score"] = (bench["experience_years"] / required_experience).clip(upper=1.0)
-            bench["Composite_Score"] = (0.7 * bench["Skill_Match"]) + (0.3 * bench["Experience_Score"])
+            
+            # Feature 4: Dynamic Weights Application
+            bench["Composite_Score"] = (skill_weight * bench["Skill_Match"]) + (exp_weight * bench["Experience_Score"])
             
             results = bench.sort_values(by="Composite_Score", ascending=False).head(top_n)
             
@@ -209,17 +252,52 @@ if st.button("Find Matching Resources", type="primary", use_container_width=True
                 "Composite_Score"
             ]].copy()
             
-            display_df["Skill_Match"] = (display_df["Skill_Match"] * 100).round(1).astype(str) + "%"
-            display_df["Composite_Score"] = (display_df["Composite_Score"] * 100).round(1).astype(str) + "%"
+            # Format percentage for display
+            display_df["Skill_Match_Pct"] = (display_df["Skill_Match"] * 100).round(1).astype(str) + "%"
+            display_df["Composite_Score_Pct"] = (display_df["Composite_Score"] * 100).round(1).astype(str) + "%"
             
             st.dataframe(
-                display_df.rename(columns={
+                display_df[[
+                    "employee_name", 
+                    "skills_profile", 
+                    "experience_years", 
+                    "Skill_Match_Pct", 
+                    "Composite_Score_Pct"
+                ]].rename(columns={
                     "employee_name": "Employee Name",
                     "skills_profile": "Skills Profile",
                     "experience_years": "Experience (Yrs)",
-                    "Skill_Match": "Skill Match",
-                    "Composite_Score": "Overall Fit"
+                    "Skill_Match_Pct": "Skill Match",
+                    "Composite_Score_Pct": "Overall Fit"
                 }),
                 use_container_width=True,
                 hide_index=True
+            )
+            
+            # Feature 2 (Contd): Scatter plot showing Experience vs Match Score
+            st.markdown("#### Candidate Fit Visualization")
+            fig_scatter = px.scatter(
+                results,
+                x="experience_years",
+                y="Composite_Score",
+                text="employee_name",
+                size=[12]*len(results),
+                color="Composite_Score",
+                color_continuous_scale="Viridis",
+                labels={"experience_years": "Experience (Years)", "Composite_Score": "Overall Fit Score"},
+                title="Top Candidates: Experience vs. Composite Fit"
+            )
+            fig_scatter.update_traces(textposition='top center')
+            fig_scatter.update_layout(height=350, margin=dict(l=20, r=20, t=40, b=20))
+            st.plotly_chart(fig_scatter, use_container_width=True)
+            
+            # Feature 5: Export Allocation Report
+            st.markdown("#### Export Results")
+            export_csv = display_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Shortlist Report (CSV)",
+                data=export_csv,
+                file_name="smartbench_shortlist_report.csv",
+                mime="text/csv",
+                use_container_width=True
             )
