@@ -63,11 +63,12 @@ st.markdown("""
 
 CSV_FILE = "employees.csv"
 
-# Session State 
+# ==================== SESSION STATE LOAD LOGIC ====================
 if "df" not in st.session_state:
     st.session_state.df = pd.read_csv(CSV_FILE)
 
 df = st.session_state.df
+
 # ==================== SIDEBAR ====================
 with st.sidebar:
     st.markdown("### Resource Onboarding")
@@ -100,15 +101,12 @@ with st.sidebar:
                     "experience_years": new_exp,
                     "status": new_status
                 }])
-                
-                # Session State मधील DataFrame मध्ये नवीन रो जोडणे
+                # Session State मध्ये नवीन डेटा सेव्ह करणे
                 st.session_state.df = pd.concat([st.session_state.df, new_entry], ignore_index=True)
-                
                 st.success(f"Added '{new_name}' to inventory.")
                 st.rerun()
 
     st.divider()
-    # Feature 4: Hyperparameter Weights Control in Sidebar
     st.markdown("### Model Weight Calibration")
     st.caption("Tune the composite scoring function balance:")
     skill_weight = st.slider("Skill Match Weight", min_value=0.1, max_value=0.9, value=0.7, step=0.05)
@@ -155,11 +153,10 @@ with m3:
     </div>
     """, unsafe_allow_html=True)
 
-# ==================== FEATURE 2: VISUAL ANALYTICS ====================
+# Visual Analytics
 with st.expander("Bench Talent Analytics & Skill Distribution", expanded=False):
     chart_col1, chart_col2 = st.columns(2)
     
-    # 1. Top Skills Chart
     all_skills_list = []
     for s in bench["skills_profile"].dropna():
         items = [x.strip().title() for x in str(s).split(",") if x.strip()]
@@ -180,7 +177,6 @@ with st.expander("Bench Talent Analytics & Skill Distribution", expanded=False):
         fig_bar.update_layout(yaxis=dict(autorange="reversed"), height=300, margin=dict(l=20, r=20, t=40, b=20))
         chart_col1.plotly_chart(fig_bar, use_container_width=True)
 
-    # 2. Experience Distribution Chart
     fig_hist = px.histogram(
         bench, 
         x="experience_years", 
@@ -222,7 +218,6 @@ with filter_col:
     required_experience = st.slider("Target Experience (Yrs)", min_value=1, max_value=15, value=4)
     top_n = st.selectbox("Max Recommendations", [3, 5, 10], index=1)
 
-# Matching Execution
 if st.button("Find Matching Resources", type="primary", use_container_width=True):
     if not project_description.strip():
         st.warning("Please supply project requirements to calculate semantic similarity.")
@@ -237,10 +232,7 @@ if st.button("Find Matching Resources", type="primary", use_container_width=True
             similarity_scores = cosine_similarity(tfidf_matrix[-1], tfidf_matrix[:-1]).flatten()
             bench["Skill_Match"] = similarity_scores
             
-            # Experience scoring function
             bench["Experience_Score"] = (bench["experience_years"] / required_experience).clip(upper=1.0)
-            
-            # Feature 4: Dynamic Weights Application
             bench["Composite_Score"] = (skill_weight * bench["Skill_Match"]) + (exp_weight * bench["Experience_Score"])
             
             results = bench.sort_values(by="Composite_Score", ascending=False).head(top_n)
@@ -255,7 +247,6 @@ if st.button("Find Matching Resources", type="primary", use_container_width=True
                 "Composite_Score"
             ]].copy()
             
-            # Format percentage for display
             display_df["Skill_Match_Pct"] = (display_df["Skill_Match"] * 100).round(1).astype(str) + "%"
             display_df["Composite_Score_Pct"] = (display_df["Composite_Score"] * 100).round(1).astype(str) + "%"
             
@@ -277,7 +268,6 @@ if st.button("Find Matching Resources", type="primary", use_container_width=True
                 hide_index=True
             )
             
-            # Feature 2 (Contd): Scatter plot showing Experience vs Match Score
             st.markdown("#### Candidate Fit Visualization")
             fig_scatter = px.scatter(
                 results,
@@ -294,7 +284,6 @@ if st.button("Find Matching Resources", type="primary", use_container_width=True
             fig_scatter.update_layout(height=350, margin=dict(l=20, r=20, t=40, b=20))
             st.plotly_chart(fig_scatter, use_container_width=True)
             
-            # Feature 5: Export Allocation Report
             st.markdown("#### Export Results")
             export_csv = display_df.to_csv(index=False).encode('utf-8')
             st.download_button(
