@@ -11,34 +11,37 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Professional Styling (Corporate Dashboard Theme) ---
+# --- Professional Styling (Card Font & Contrast Fixed) ---
 st.markdown("""
 <style>
     /* Metric Card Styling */
     div[data-testid="stMetric"] {
-        background-color: #0e1117;
-        border: 1px solid #1f2937;
-        padding: 18px 24px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-    }
-    div[data-testid="stMetricLabel"] {
-        font-size: 0.85rem !important;
-        font-weight: 600;
-        color: #9ca3af !important;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    div[data-testid="stMetricValue"] {
-        font-size: 2rem !important;
-        font-weight: 700;
-        color: #60a5fa !important;
+        background-color: #111827;
+        border: 1px solid #374151;
+        padding: 14px 18px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        text-align: center;
     }
     
-    /* Headers & Section Titles */
-    h1, h2, h3 {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-weight: 600;
+    /* Metric Label (Title वरचा मजकूर स्पष्ट आणि पांढरा/फिकट निळा दिसेल) */
+    div[data-testid="stMetricLabel"] > div {
+        font-size: 0.90rem !important;
+        font-weight: 700 !important;
+        color: #e5e7eb !important; /* High contrast light grey/white */
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        white-space: normal !important; /* कापला जाणार नाही, नवीन लाईनवर येईल */
+        overflow: visible !important;
+        line-height: 1.3 !important;
+    }
+    
+    /* Metric Value (20, 13, 65% मोठे आणि स्पष्ट दिसतील) */
+    div[data-testid="stMetricValue"] > div {
+        font-size: 1.85rem !important;
+        font-weight: 800 !important;
+        color: #60a5fa !important; /* Bright crisp blue */
+        white-space: nowrap !important;
     }
     
     /* Top Banner Card */
@@ -108,7 +111,7 @@ with st.sidebar:
                 st.rerun()
 
     st.divider()
-    st.caption("SmartBench Optimizer Engine v2.4 | Enterprise MCA Edition")
+    st.caption("SmartBench Optimizer Engine v2.4 | Enterprise Edition")
 
 # ==================== MAIN DASHBOARD ====================
 st.markdown("""
@@ -120,13 +123,13 @@ st.markdown("""
 
 bench = df[df["status"] == "Bench"].copy()
 
-# Key Metric Cards
+# Key Metric Cards (Text Clear & Contrast Fixed)
 m1, m2, m3 = st.columns(3)
 m1.metric("Total Headcount", len(df))
 m2.metric("Available on Bench", len(bench))
 m3.metric("Bench Ratio", f"{(len(bench) / len(df) * 100):.1f}%" if len(df) > 0 else "0%")
 
-# Expander for Bench Roster (In English)
+# Expander for Bench Roster
 with st.expander("View Active Bench Roster", expanded=False):
     st.dataframe(
         bench[["employee_name", "skills_profile", "experience_years"]].rename(columns={
@@ -164,19 +167,14 @@ if st.button("Find Matching Resources", type="primary", use_container_width=True
         st.error("No resources currently marked as 'Bench'.")
     else:
         with st.spinner("Computing cosine similarity vectors..."):
-            # TF-IDF Vectorization
             vectorizer = TfidfVectorizer(stop_words='english')
             all_documents = list(bench["skills_profile"]) + [project_description]
             tfidf_matrix = vectorizer.fit_transform(all_documents)
             
-            # Semantic Similarity
             similarity_scores = cosine_similarity(tfidf_matrix[-1], tfidf_matrix[:-1]).flatten()
             bench["Skill_Match"] = similarity_scores
             
-            # Experience Fit Function
             bench["Experience_Score"] = (bench["experience_years"] / required_experience).clip(upper=1.0)
-            
-            # Composite Scoring (70% Semantic Skill Match, 30% Experience Proximity)
             bench["Composite_Score"] = (0.7 * bench["Skill_Match"]) + (0.3 * bench["Experience_Score"])
             
             results = bench.sort_values(by="Composite_Score", ascending=False).head(top_n)
