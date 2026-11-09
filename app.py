@@ -19,17 +19,57 @@ st.set_page_config(
 # Premium styling
 # ---------------------------------------------------------------
 st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    /* सर्व सामान्य टेक्स्ट आणि लेबल्स पांढरे करण्यासाठी */
+    html, body, [class*="css"], label, p, span { 
+        font-family: 'Inter', sans-serif;
+        color: #f8fafc !important; 
+    }
 
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    /* Text Area - टायपिंग फॉन्ट आणि प्लेसहोल्डर */
+    .stTextArea textarea {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 14px !important;
+        color: #ffffff !important; /* टाइप केलेला फॉन्ट पांढरा */
+        font-size: 1rem !important;
+    }
+    
+    .stTextArea textarea::placeholder {
+        color: #94a3b8 !important; /* फिकट पांढरा/राखाडी प्लेसहोल्डर */
+        opacity: 1 !important;
+    }
 
-    .stApp {
-        background: radial-gradient(1200px 600px at 10% -10%, #1e1b4b 0%, transparent 60%),
-                    radial-gradient(900px 500px at 100% 0%, #0c4a6e 0%, transparent 55%),
-                    #0b1020;
-        color: #e5e7eb;
+    .stTextArea textarea:focus { 
+        border-color: #38bdf8 !important; 
+        box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4) !important; 
+        color: #ffffff !important;
+    }
+
+    /* Sidebar - साइडबारमधील सर्व टेक्स्ट आणि कॅप्शन्स */
+    section[data-testid="stSidebar"] {
+        background: #090d1a !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    section[data-testid="stSidebar"] * {
+        color: #ffffff !important;
+    }
+    section[data-testid="stSidebar"] .stCaption {
+        color: #cbd5e1 !important;
+    }
+
+    /* Cards मधील लेबल्स */
+    .card .label { 
+        font-size: .78rem; 
+        letter-spacing: .08em; 
+        text-transform: uppercase; 
+        color: #cbd5e1 !important; 
+    }
+    .card .value { 
+        font-size: 1.9rem; 
+        font-weight: 700; 
+        color: #ffffff !important; 
+        margin-top: .15rem; 
+    }
     }
     #MainMenu, footer, header { visibility: hidden; }
     .block-container { padding-top: 2rem; max-width: 1200px; }
