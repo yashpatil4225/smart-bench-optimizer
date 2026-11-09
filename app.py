@@ -63,11 +63,11 @@ st.markdown("""
 
 CSV_FILE = "employees.csv"
 
-def load_data():
-    return pd.read_csv(CSV_FILE)
+# Session State 
+if "df" not in st.session_state:
+    st.session_state.df = pd.read_csv(CSV_FILE)
 
-df = load_data()
-
+df = st.session_state.df
 # ==================== SIDEBAR ====================
 with st.sidebar:
     st.markdown("### Resource Onboarding")
@@ -100,7 +100,10 @@ with st.sidebar:
                     "experience_years": new_exp,
                     "status": new_status
                 }])
-                new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
+                
+                # Session State मधील DataFrame मध्ये नवीन रो जोडणे
+                st.session_state.df = pd.concat([st.session_state.df, new_entry], ignore_index=True)
+                
                 st.success(f"Added '{new_name}' to inventory.")
                 st.rerun()
 
