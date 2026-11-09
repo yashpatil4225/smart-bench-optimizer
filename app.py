@@ -4,6 +4,7 @@ import plotly.express as px
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from collections import Counter
+import io
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -63,7 +64,7 @@ st.markdown("""
 
 CSV_FILE = "employees.csv"
 
-# ==================== SESSION STATE LOAD LOGIC ====================
+# Session State मधील डेटा हाताळणी
 if "df" not in st.session_state:
     st.session_state.df = pd.read_csv(CSV_FILE)
 
@@ -101,7 +102,6 @@ with st.sidebar:
                     "experience_years": new_exp,
                     "status": new_status
                 }])
-                # Session State मध्ये नवीन डेटा सेव्ह करणे
                 st.session_state.df = pd.concat([st.session_state.df, new_entry], ignore_index=True)
                 st.success(f"Added '{new_name}' to inventory.")
                 st.rerun()
@@ -250,20 +250,22 @@ if st.button("Find Matching Resources", type="primary", use_container_width=True
             display_df["Skill_Match_Pct"] = (display_df["Skill_Match"] * 100).round(1).astype(str) + "%"
             display_df["Composite_Score_Pct"] = (display_df["Composite_Score"] * 100).round(1).astype(str) + "%"
             
+            clean_display = display_df[[
+                "employee_name", 
+                "skills_profile", 
+                "experience_years", 
+                "Skill_Match_Pct", 
+                "Composite_Score_Pct"
+            ]].rename(columns={
+                "employee_name": "Employee Name",
+                "skills_profile": "Skills Profile",
+                "experience_years": "Experience (Years)",
+                "Skill_Match_Pct": "Skill Match (%)",
+                "Composite_Score_Pct": "Overall Fit (%)"
+            })
+            
             st.dataframe(
-                display_df[[
-                    "employee_name", 
-                    "skills_profile", 
-                    "experience_years", 
-                    "Skill_Match_Pct", 
-                    "Composite_Score_Pct"
-                ]].rename(columns={
-                    "employee_name": "Employee Name",
-                    "skills_profile": "Skills Profile",
-                    "experience_years": "Experience (Yrs)",
-                    "Skill_Match_Pct": "Skill Match",
-                    "Composite_Score_Pct": "Overall Fit"
-                }),
+                clean_display,
                 use_container_width=True,
                 hide_index=True
             )
@@ -284,12 +286,31 @@ if st.button("Find Matching Resources", type="primary", use_container_width=True
             fig_scatter.update_layout(height=350, margin=dict(l=20, r=20, t=40, b=20))
             st.plotly_chart(fig_scatter, use_container_width=True)
             
-            st.markdown("#### Export Results")
-            export_csv = display_df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Download Shortlist Report (CSV)",
-                data=export_csv,
-                file_name="smartbench_shortlist_report.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+            # ==================== EXPORT RESULTS (CSV & EXCEL) ====================
+            st.markdown("#### Export Allocation Report")
+            exp_col1, exp_col2 = st.columns(2)
+            
+            # 1. Download CSV Button
+            with exp_col1:
+                export_csv = clean_display.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download CSV Report",
+                    data=export_csv,
+                    file_name="SmartBench_Shortlist.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            
+            # 2. Download Excel (.xlsx) Button (Proper Row/Column Table)
+            with exp_col2:
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                    clean_display.to_excel(writer, index=False, sheet_name='Shortlisted Resources')
+                
+                st.download_button(
+                    label="📊 Download Excel Spreadsheet (.xlsx)",
+                    data=buffer.getvalue(),
+                    file_name="SmartBench_Resource_Allocation.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
