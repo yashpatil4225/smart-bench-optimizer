@@ -1,337 +1,580 @@
-import io
-import os
-
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from collections import Counter
+import io
 
-# ---------------------------------------------------------------
-# Page config
-# ---------------------------------------------------------------
+# ==============================================================================
+# 1. PAGE CONFIGURATION & METADATA
+# ==============================================================================
 st.set_page_config(
-    page_title="Smart Bench Optimizer",
-    page_icon="🎯",
+    page_title="SmartBench AI — Enterprise Talent Optimization",
+    page_icon="⬡",
     layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# ---------------------------------------------------------------
-# Premium styling
-# ---------------------------------------------------------------
-st.markdown(
-    /* सर्व सामान्य टेक्स्ट आणि लेबल्स पांढरे करण्यासाठी */
-    html, body, [class*="css"], label, p, span { 
-        font-family: 'Inter', sans-serif;
-        color: #f8fafc !important; 
+# ==============================================================================
+# 2. DESIGN SYSTEM & CSS (LINEAR / VERCEL SAAS THEME)
+# ==============================================================================
+st.markdown("""
+<style>
+    /* Google Fonts Import */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    /* Global Root Variables */
+    :root {
+        --bg-primary: #0A0D14;
+        --bg-secondary: #0F172A;
+        --bg-card: #131B2E;
+        --border-subtle: rgba(255, 255, 255, 0.08);
+        --border-accent: rgba(56, 189, 248, 0.25);
+        --accent-blue: #38BDF8;
+        --accent-indigo: #6366F1;
+        --text-primary: #F8FAFC;
+        --text-secondary: #94A3B8;
+        --text-muted: #64748B;
     }
 
-    /* Text Area - टायपिंग फॉन्ट आणि प्लेसहोल्डर */
-    .stTextArea textarea {
-        background: rgba(255, 255, 255, 0.08) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 14px !important;
-        color: #ffffff !important; /* टाइप केलेला फॉन्ट पांढरा */
-        font-size: 1rem !important;
-    }
-    
-    .stTextArea textarea::placeholder {
-        color: #94a3b8 !important; /* फिकट पांढरा/राखाडी प्लेसहोल्डर */
-        opacity: 1 !important;
+    /* Base Font Override */
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        color: var(--text-primary);
     }
 
-    .stTextArea textarea:focus { 
-        border-color: #38bdf8 !important; 
-        box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4) !important; 
-        color: #ffffff !important;
+    /* Hide default Streamlit decoration header & deploy button clutter */
+    header[data-testid="stHeader"] {
+        background-color: transparent !important;
     }
+    #MainMenu, footer {visibility: hidden;}
 
-    /* Sidebar - साइडबारमधील सर्व टेक्स्ट आणि कॅप्शन्स */
+    /* Sidebar Customization */
     section[data-testid="stSidebar"] {
-        background: #090d1a !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        background-color: #07090E !important;
+        border-right: 1px solid var(--border-subtle);
     }
-    section[data-testid="stSidebar"] * {
-        color: #ffffff !important;
-    }
-    section[data-testid="stSidebar"] .stCaption {
-        color: #cbd5e1 !important;
+    section[data-testid="stSidebar"] div.block-container {
+        padding-top: 2rem;
     }
 
-    /* Cards मधील लेबल्स */
-    .card .label { 
-        font-size: .78rem; 
-        letter-spacing: .08em; 
-        text-transform: uppercase; 
-        color: #cbd5e1 !important; 
+    /* SaaS Brand Identity Header */
+    .brand-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border-subtle);
+        margin-bottom: 24px;
     }
-    .card .value { 
-        font-size: 1.9rem; 
-        font-weight: 700; 
-        color: #ffffff !important; 
-        margin-top: .15rem; 
+    .brand-logo {
+        background: linear-gradient(135deg, #0284C7, #6366F1);
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 1.2rem;
+        color: #FFFFFF;
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.35);
     }
+    .brand-text {
+        font-size: 1.15rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: #F8FAFC;
+        margin: 0;
     }
-    #MainMenu, footer, header { visibility: hidden; }
-    .block-container { padding-top: 2rem; max-width: 1200px; }
+    .brand-badge {
+        font-size: 0.65rem;
+        background: rgba(56, 189, 248, 0.12);
+        color: #38BDF8;
+        padding: 2px 7px;
+        border-radius: 9999px;
+        border: 1px solid rgba(56, 189, 248, 0.25);
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        display: inline-block;
+        margin-top: 2px;
+    }
 
-    /* Hero */
-    .hero {
-        padding: 2rem 2.2rem;
-        border-radius: 20px;
-        background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(14,165,233,0.18));
-        border: 1px solid rgba(255,255,255,0.10);
-        box-shadow: 0 20px 50px rgba(0,0,0,0.35);
-        margin-bottom: 1.5rem;
-    }
-    .hero h1 {
-        margin: 0; font-size: 2.2rem; font-weight: 800;
-        background: linear-gradient(90deg, #a5b4fc, #67e8f9);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    }
-    .hero p { margin: .5rem 0 0 0; color: #cbd5e1; font-size: 1.02rem; }
-
-    /* Metric cards */
-    .card {
-        padding: 1.1rem 1.3rem;
+    /* Linear-Style Hero Banner */
+    .hero-panel {
+        background: radial-gradient(100% 120% at 50% 0%, rgba(30, 58, 138, 0.28) 0%, rgba(10, 13, 20, 0) 100%), #0D1322;
+        border: 1px solid var(--border-subtle);
+        padding: 30px 36px;
         border-radius: 16px;
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.09);
-        backdrop-filter: blur(8px);
+        margin-bottom: 28px;
+        position: relative;
+        overflow: hidden;
     }
-    .card .label { font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; }
-    .card .value { font-size: 1.9rem; font-weight: 700; color: #f8fafc; margin-top: .15rem; }
-    .card .sub { font-size: .8rem; color: #67e8f9; }
-
-    /* Section titles */
-    .section-title { font-size: 1.15rem; font-weight: 700; margin: 1.6rem 0 .7rem 0; color: #f1f5f9; }
-
-    /* Inputs */
-    .stTextArea textarea {
-        background: rgba(255,255,255,0.06) !important;
-        border: 1px solid rgba(255,255,255,0.14) !important;
-        border-radius: 14px !important;
-        color: #f8fafc !important;
+    .hero-panel::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 15%;
+        right: 15%;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.6), transparent);
     }
-    .stTextArea textarea:focus { border-color: #818cf8 !important; box-shadow: 0 0 0 2px rgba(129,140,248,.35) !important; }
-
-    /* Buttons */
-    .stButton > button {
-        width: 100%;
-        border: none; border-radius: 14px;
-        padding: .8rem 1rem; font-weight: 700; font-size: 1rem;
-        color: white;
-        background: linear-gradient(90deg, #6366f1, #0ea5e9);
-        box-shadow: 0 10px 25px rgba(99,102,241,.35);
-        transition: transform .15s ease, box-shadow .15s ease;
+    .hero-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        color: #FFFFFF;
+        margin: 0 0 6px 0;
     }
-    .stButton > button:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(14,165,233,.45); color: white; }
-
-    .stDownloadButton > button {
-        width: 100%;
-        border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.18);
-        background: rgba(255,255,255,0.06);
-        color: #e2e8f0; font-weight: 600;
-    }
-    .stDownloadButton > button:hover { border-color: #67e8f9; color: #67e8f9; }
-
-    /* Sidebar */
-    section[data-testid="stSidebar"] {
-        background: rgba(10,14,30,0.95);
-        border-right: 1px solid rgba(255,255,255,0.08);
+    .hero-subtitle {
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        margin: 0;
+        max-width: 650px;
+        line-height: 1.5;
     }
 
-    /* Dataframe */
-    div[data-testid="stDataFrame"] { border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.09); }
+    /* KPI Metric Cards */
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .kpi-card {
+        background-color: #0F172A;
+        border: 1px solid var(--border-subtle);
+        padding: 20px 24px;
+        border-radius: 14px;
+        transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .kpi-card:hover {
+        border-color: var(--border-accent);
+        transform: translateY(-2px);
+    }
+    .kpi-label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+    }
+    .kpi-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        color: #F8FAFC;
+        line-height: 1.1;
+    }
+    .kpi-tag {
+        font-size: 0.75rem;
+        color: #38BDF8;
+        font-weight: 500;
+        margin-top: 6px;
+    }
 
-    .footer-note { text-align:center; color:#64748b; font-size:.8rem; margin-top:2.5rem; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+    /* Form Card & Sidebar Components */
+    .section-card {
+        background: #0E1626;
+        border: 1px solid var(--border-subtle);
+        border-radius: 14px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+    .section-header {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #FFFFFF;
+        margin-bottom: 4px;
+    }
+    .section-caption {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        margin-bottom: 18px;
+    }
 
+    /* Streamlit Input & Widget Polish */
+    div[data-baseweb="input"] > div, 
+    div[data-baseweb="textarea"] > div,
+    div[data-baseweb="select"] > div {
+        background-color: #0B111E !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 8px !important;
+        color: #F8FAFC !important;
+    }
+    div[data-baseweb="input"] > div:focus-within, 
+    div[data-baseweb="textarea"] > div:focus-within,
+    div[data-baseweb="select"] > div:focus-within {
+        border-color: #38BDF8 !important;
+        box-shadow: 0 0 0 1px #38BDF8 !important;
+    }
 
-# ---------------------------------------------------------------
-# Data
-# ---------------------------------------------------------------
-@st.cache_data
-def load_data() -> pd.DataFrame:
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "employees.csv")
-    return pd.read_csv(path)
+    /* Modern Buttons */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #0284C7, #2563EB) !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 10px 24px !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.01em !important;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35) !important;
+        transition: all 0.2s ease !important;
+    }
+    button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #0369A1, #1D4ED8) !important;
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5) !important;
+        transform: translateY(-1px);
+    }
+    button[kind="secondary"] {
+        background-color: #1E293B !important;
+        border: 1px solid var(--border-subtle) !important;
+        color: #F8FAFC !important;
+        border-radius: 8px !important;
+    }
 
+    /* Dataframe Table Elevation */
+    div[data-testid="stDataFrame"] {
+        border: 1px solid var(--border-subtle);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-df = load_data()
+# ==============================================================================
+# 3. DATA PERSISTENCE & SESSION STATE
+# ==============================================================================
+CSV_FILE = "employees.csv"
+
+if "df" not in st.session_state:
+    try:
+        st.session_state.df = pd.read_csv(CSV_FILE)
+    except FileNotFoundError:
+        st.session_state.df = pd.DataFrame(columns=[
+            "employee_name", "skills_profile", "experience_years", "status"
+        ])
+
+df = st.session_state.df
+
+# ==============================================================================
+# 4. SIDEBAR NAVIGATION & ONBOARDING CONTROLS
+# ==============================================================================
+with st.sidebar:
+    # SaaS Brand Header
+    st.markdown("""
+    <div class="brand-container">
+        <div class="brand-logo">⬡</div>
+        <div>
+            <div class="brand-text">SmartBench AI</div>
+            <div class="brand-badge">Enterprise SaaS</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Resource Intake Card
+    st.markdown('<div class="section-header">Resource Intake</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-caption">Register new or bench engineer into cluster</div>', unsafe_allow_html=True)
+    
+    with st.form(key="add_resource_form", clear_on_submit=True):
+        new_name = st.text_input("Full Name", placeholder="e.g. Alex Johnson")
+        new_skills = st.text_area(
+            "Skills Inventory (Comma-delimited)", 
+            placeholder="e.g. Python, Docker, FastAPI, PostgreSQL, AWS",
+            height=85
+        )
+        new_exp = st.number_input("Experience (Years)", min_value=0.0, max_value=30.0, value=3.0, step=0.5)
+        new_status = st.selectbox("Allocation Status", ["Bench", "Allocated"])
+        
+        onboard_btn = st.form_submit_button("Register Resource", use_container_width=True, type="primary")
+        
+        if onboard_btn:
+            if not new_name.strip() or not new_skills.strip():
+                st.error("Validation failed: Both Name and Skills are mandatory.")
+            else:
+                new_entry = pd.DataFrame([{
+                    "employee_name": new_name.strip(),
+                    "skills_profile": new_skills.strip(),
+                    "experience_years": float(new_exp),
+                    "status": new_status
+                }])
+                st.session_state.df = pd.concat([st.session_state.df, new_entry], ignore_index=True)
+                
+                # Best-effort disk sync
+                try:
+                    new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
+                except Exception:
+                    pass
+                
+                st.success(f"Successfully inducted '{new_name}'")
+                st.rerun()
+
+    st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 24px 0;'>", unsafe_allow_html=True)
+
+    # Hyperparameter Weight Tuning
+    st.markdown('<div class="section-header">Matching Hyperparameters</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-caption">Calibrate dynamic ranking objective weights</div>', unsafe_allow_html=True)
+    
+    skill_weight = st.slider("Skill Match Weight", min_value=0.1, max_value=0.9, value=0.7, step=0.05)
+    exp_weight = round(1.0 - skill_weight, 2)
+    
+    st.markdown(f"""
+    <div style="background: #0B111E; border: 1px solid rgba(255,255,255,0.08); padding: 12px 14px; border-radius: 8px; margin-top: 10px;">
+        <div style="font-size: 0.72rem; color: #94A3B8; text-transform: uppercase; font-weight: 600;">Scoring Equation</div>
+        <div style="font-size: 0.88rem; font-weight: 600; color: #38BDF8; margin-top: 2px;">
+            {int(skill_weight * 100)}% Skill <span style="color: #64748B;">+</span> {int(exp_weight * 100)}% Experience
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ==============================================================================
+# 5. MAIN HERO & DASHBOARD METRICS
+# ==============================================================================
+st.markdown("""
+<div class="hero-panel">
+    <div class="hero-title">SmartBench Resource Allocation Optimizer</div>
+    <div class="hero-subtitle">
+        AI-driven resource orchestration engine utilizing TF-IDF semantic vectorization and composite similarity scoring to match project pipelines with active bench talent.
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 bench = df[df["status"] == "Bench"].copy()
 
+total_headcount = len(df)
+bench_headcount = len(bench)
+bench_ratio = f"{(bench_headcount / total_headcount * 100):.1f}%" if total_headcount > 0 else "0.0%"
 
-# ---------------------------------------------------------------
-# Matching logic (TF-IDF + cosine similarity + hybrid score)
-# ---------------------------------------------------------------
-def rank_employees(bench_df, project_text, required_exp, skill_w, exp_w):
-    ranked = bench_df.copy()
-    vectorizer = TfidfVectorizer()
-    all_text = list(ranked["skills_profile"]) + [project_text]
-    matrix = vectorizer.fit_transform(all_text)
-    ranked["Skill_Score"] = cosine_similarity(matrix[-1], matrix[:-1]).flatten()
-    ranked["Experience_Score"] = (ranked["experience_years"] / required_exp).clip(upper=1.0)
-    ranked["Final_Score"] = skill_w * ranked["Skill_Score"] + exp_w * ranked["Experience_Score"]
-    ranked = ranked.sort_values("Final_Score", ascending=False).head(5).reset_index(drop=True)
-    ranked.insert(0, "Rank", ranked.index + 1)
-    return ranked
+# KPI Component Cards
+col1, col2, col3 = st.columns(3)
 
-
-def to_excel_bytes(frame: pd.DataFrame) -> bytes:
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        frame.to_excel(writer, index=False, sheet_name="Top Matches")
-        sheet = writer.sheets["Top Matches"]
-        for col in sheet.columns:
-            width = max(len(str(cell.value)) if cell.value is not None else 0 for cell in col)
-            sheet.column_dimensions[col[0].column_letter].width = min(width + 3, 60)
-    return buffer.getvalue()
-
-
-# ---------------------------------------------------------------
-# Sidebar (settings)
-# ---------------------------------------------------------------
-with st.sidebar:
-    st.markdown("### ⚙️ Settings")
-    required_experience = st.slider("Required experience (years)", 1, 10, 4)
-    skill_pct = st.slider("Skill weight (%)", 0, 100, 70, step=5)
-    exp_pct = 100 - skill_pct
-    st.caption(f"Skill **{skill_pct}%**  +  Experience **{exp_pct}%**")
-    st.markdown("---")
-    st.caption(
-        "Skills are converted with TF-IDF, compared using cosine similarity, "
-        "then combined with experience into a final score."
-    )
-
-# ---------------------------------------------------------------
-# Hero
-# ---------------------------------------------------------------
-st.markdown(
-    """
-    <div class="hero">
-        <h1>🎯 IT Smart-Bench &amp; Resource Allocation Optimizer</h1>
-        <p>Describe your project and instantly find the best available employees from the bench.</p>
+with col1:
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-label">Total Enterprise Headcount</div>
+        <div class="kpi-value">{total_headcount}</div>
+        <div class="kpi-tag">Active Talent Pool</div>
     </div>
-    """,
-    unsafe_allow_html=True,
-)
+    """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------------
-# Stat cards
-# ---------------------------------------------------------------
-c1, c2, c3 = st.columns(3)
-with c1:
-    st.markdown(
-        f'<div class="card"><div class="label">Employees on bench</div>'
-        f'<div class="value">{len(bench)}</div><div class="sub">available now</div></div>',
-        unsafe_allow_html=True,
-    )
-with c2:
-    st.markdown(
-        f'<div class="card"><div class="label">Total employees</div>'
-        f'<div class="value">{len(df)}</div><div class="sub">in database</div></div>',
-        unsafe_allow_html=True,
-    )
-with c3:
-    avg_exp = bench["experience_years"].mean() if len(bench) else 0
-    st.markdown(
-        f'<div class="card"><div class="label">Avg bench experience</div>'
-        f'<div class="value">{avg_exp:.1f} yrs</div><div class="sub">across bench</div></div>',
-        unsafe_allow_html=True,
-    )
+with col2:
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-label">Available on Bench</div>
+        <div class="kpi-value" style="color: #38BDF8;">{bench_headcount}</div>
+        <div class="kpi-tag">Ready for Allocation</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------------
-# Input
-# ---------------------------------------------------------------
-st.markdown('<div class="section-title">📝 Project requirement</div>', unsafe_allow_html=True)
-project_description = st.text_area(
-    "Project description",
-    placeholder="e.g. Need a python developer with machine learning and sql knowledge",
-    height=120,
-    label_visibility="collapsed",
-)
+with col3:
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-label">Bench Utilization Gap</div>
+        <div class="kpi-value" style="color: #818CF8;">{bench_ratio}</div>
+        <div class="kpi-tag">Optimization Opportunity</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-if st.button("🔍 Find Available Resources"):
-    if not project_description.strip():
-        st.warning("Please enter a project description.")
-        st.session_state.pop("result", None)
-    elif bench.empty:
-        st.info("No employees are currently on the bench.")
-        st.session_state.pop("result", None)
-    else:
-        st.session_state["result"] = rank_employees(
-            bench,
-            project_description,
-            required_experience,
-            skill_pct / 100,
-            exp_pct / 100,
+st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+
+# ==============================================================================
+# 6. TABBED DATA EXPLORATION SUITE
+# ==============================================================================
+tab_analytics, tab_roster = st.tabs(["📊 Bench Talent Analytics", "📋 Active Talent Roster"])
+
+with tab_analytics:
+    chart_c1, chart_c2 = st.columns(2)
+    
+    # 1. Available Skills Distribution Chart
+    all_skills_list = []
+    for s in bench["skills_profile"].dropna():
+        items = [x.strip().title() for x in str(s).split(",") if x.strip()]
+        all_skills_list.extend(items)
+    
+    skill_counts = Counter(all_skills_list).most_common(8)
+    if skill_counts:
+        skills_df = pd.DataFrame(skill_counts, columns=["Skill", "Count"])
+        fig_bar = px.bar(
+            skills_df,
+            x="Count",
+            y="Skill",
+            orientation="h",
+            title="Top Skills Inventory on Bench",
+            color="Count",
+            color_continuous_scale=[[0, "#1E3A8A"], [1, "#38BDF8"]]
         )
+        fig_bar.update_layout(
+            template="plotly_dark",
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(l=10, r=20, t=40, b=10),
+            height=290,
+            yaxis=dict(autorange="reversed", showgrid=False),
+            xaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.06)'),
+            font=dict(family="Inter, sans-serif", size=12, color="#94A3B8")
+        )
+        chart_c1.plotly_chart(fig_bar, use_container_width=True)
 
-# ---------------------------------------------------------------
-# Results (kept in session_state so downloads don't clear them)
-# ---------------------------------------------------------------
-if "result" in st.session_state:
-    result = st.session_state["result"]
-
-    st.markdown('<div class="section-title">🏆 Top Matched Employees</div>', unsafe_allow_html=True)
-
-    best = result.iloc[0]
-    b1, b2, b3 = st.columns(3)
-    b1.metric("Best match", best["employee_name"])
-    b2.metric("Final score", f"{best['Final_Score']:.2f}")
-    b3.metric("Experience", f"{int(best['experience_years'])} yrs")
-
-    display = result[
-        ["Rank", "employee_name", "skills_profile", "experience_years",
-         "Skill_Score", "Experience_Score", "Final_Score"]
-    ].rename(
-        columns={
-            "employee_name": "Employee",
-            "skills_profile": "Skills",
-            "experience_years": "Experience (yrs)",
-            "Skill_Score": "Skill Score",
-            "Experience_Score": "Experience Score",
-            "Final_Score": "Final Score",
-        }
+    # 2. Experience Cohort Distribution
+    fig_hist = px.histogram(
+        bench,
+        x="experience_years",
+        nbins=7,
+        title="Experience Density (Years)",
+        color_discrete_sequence=["#6366F1"]
     )
+    fig_hist.update_layout(
+        template="plotly_dark",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=10, r=20, t=40, b=10),
+        height=290,
+        xaxis=dict(title="Experience (Years)", showgrid=False),
+        yaxis=dict(title="Engineers", showgrid=True, gridcolor='rgba(255,255,255,0.06)'),
+        font=dict(family="Inter, sans-serif", size=12, color="#94A3B8")
+    )
+    chart_c2.plotly_chart(fig_hist, use_container_width=True)
 
+with tab_roster:
     st.dataframe(
-        display,
+        bench[["employee_name", "skills_profile", "experience_years"]].rename(columns={
+            "employee_name": "Resource Name",
+            "skills_profile": "Skills Profile",
+            "experience_years": "Experience (Yrs)"
+        }),
         use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Skill Score": st.column_config.ProgressColumn("Skill Score", min_value=0.0, max_value=1.0, format="%.2f"),
-            "Experience Score": st.column_config.ProgressColumn("Experience Score", min_value=0.0, max_value=1.0, format="%.2f"),
-            "Final Score": st.column_config.ProgressColumn("Final Score", min_value=0.0, max_value=1.0, format="%.2f"),
-        },
+        hide_index=True
     )
 
-    # Export
-    st.markdown('<div class="section-title">📥 Export results</div>', unsafe_allow_html=True)
-    export_frame = display.copy()
-    for col in ["Skill Score", "Experience Score", "Final Score"]:
-        export_frame[col] = export_frame[col].round(3)
+st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
-    d1, d2 = st.columns(2)
-    with d1:
-        st.download_button(
-            "⬇️ Download CSV",
-            data=export_frame.to_csv(index=False).encode("utf-8"),
-            file_name="top_bench_matches.csv",
-            mime="text/csv",
-        )
-    with d2:
-        st.download_button(
-            "⬇️ Download Excel",
-            data=to_excel_bytes(export_frame),
-            file_name="top_bench_matches.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+# ==============================================================================
+# 7. SEMANTIC MATCHING STUDIO
+# ==============================================================================
+st.markdown('<div class="section-card">', unsafe_allow_html=True)
+st.markdown('<div class="section-header">Project Scope & Semantic Matching</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-caption">Input technical specifications to run TF-IDF Vectorization against active bench profiles.</div>', unsafe_allow_html=True)
 
-st.markdown(
-    '<div class="footer-note">Built with Python · Pandas · Scikit-learn · Streamlit</div>',
-    unsafe_allow_html=True,
-)
+query_col, config_col = st.columns([3, 1])
+
+with query_col:
+    project_description = st.text_area(
+        "Technical Requirements / Statement of Work",
+        placeholder="e.g. Architecting a scalable microservices backend using Python, FastAPI, Docker, and PostgreSQL with experience in distributed caching and AWS deployments.",
+        height=115
+    )
+
+with config_col:
+    required_experience = st.slider("Target Experience (Yrs)", min_value=1, max_value=15, value=4)
+    top_n = st.selectbox("Recommendation Cap", [3, 5, 10], index=1)
+
+run_matching = st.button("Execute Semantic Match", type="primary", use_container_width=True)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# ==============================================================================
+# 8. MATCHING ENGINE EXECUTION & REPORTING
+# ==============================================================================
+if run_matching:
+    if not project_description.strip():
+        st.warning("Input required: Please provide technical project requirements to compute similarity vectors.")
+    elif len(bench) == 0:
+        st.error("Operation halted: No resources currently available in the 'Bench' pool.")
+    else:
+        with st.spinner("Computing cosine similarity vectors across skill matrix..."):
+            # 1. TF-IDF Semantic Tokenization
+            vectorizer = TfidfVectorizer(stop_words='english')
+            corpus = list(bench["skills_profile"]) + [project_description]
+            tfidf_matrix = vectorizer.fit_transform(corpus)
+            
+            # 2. Cosine Similarity Computation
+            scores = cosine_similarity(tfidf_matrix[-1], tfidf_matrix[:-1]).flatten()
+            bench["Skill_Match"] = scores
+            
+            # 3. Normalized Experience Fit
+            bench["Experience_Score"] = (bench["experience_years"] / required_experience).clip(upper=1.0)
+            
+            # 4. Composite Scoring Matrix
+            bench["Composite_Score"] = (skill_weight * bench["Skill_Match"]) + (exp_weight * bench["Experience_Score"])
+            
+            results = bench.sort_values(by="Composite_Score", ascending=False).head(top_n).copy()
+            
+            # Format Displays
+            results["Skill_Match_Pct"] = (results["Skill_Match"] * 100).round(1).astype(str) + "%"
+            results["Composite_Score_Pct"] = (results["Composite_Score"] * 100).round(1).astype(str) + "%"
+            
+            clean_display = results[[
+                "employee_name", "skills_profile", "experience_years", "Skill_Match_Pct", "Composite_Score_Pct"
+            ]].rename(columns={
+                "employee_name": "Resource Name",
+                "skills_profile": "Skills Profile",
+                "experience_years": "Experience (Yrs)",
+                "Skill_Match_Pct": "Skill Similarity",
+                "Composite_Score_Pct": "Composite Fit"
+            })
+            
+            st.markdown("### Top Ranked Allocations")
+            st.dataframe(clean_display, use_container_width=True, hide_index=True)
+            
+            # Interactive Fit Mapping (Plotly Scatter)
+            st.markdown("#### Candidate Distribution Fit Matrix")
+            fig_scatter = px.scatter(
+                results,
+                x="experience_years",
+                y="Composite_Score",
+                text="employee_name",
+                size=[14] * len(results),
+                color="Composite_Score",
+                color_continuous_scale=[[0, "#3B82F6"], [1, "#38BDF8"]],
+                labels={"experience_years": "Experience (Years)", "Composite_Score": "Composite Match Score"},
+                title="Resource Matrix: Experience Proximity vs. Overall Compatibility"
+            )
+            fig_scatter.update_traces(
+                textposition='top center',
+                textfont=dict(family="Inter", color="#E2E8F0", size=11)
+            )
+            fig_scatter.update_layout(
+                template="plotly_dark",
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                height=340,
+                margin=dict(l=20, r=20, t=40, b=20),
+                yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.06)'),
+                xaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.06)'),
+                font=dict(family="Inter, sans-serif", color="#94A3B8")
+            )
+            st.plotly_chart(fig_scatter, use_container_width=True)
+            
+            # ==================================================================
+            # 9. EXPORT & ARTIFACT HUB
+            # ==================================================================
+            st.markdown("#### Export Allocation Brief")
+            c_csv, c_excel = st.columns(2)
+            
+            # Export File Definitions
+            export_df = clean_display.copy()
+            
+            with c_csv:
+                csv_bytes = export_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Export Shortlist (.CSV)",
+                    data=csv_bytes,
+                    file_name="SmartBench_Allocation_Brief.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+                
+            with c_excel:
+                excel_buffer = io.BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                    export_df.to_excel(writer, index=False, sheet_name='Shortlisted Candidates')
+                
+                st.download_button(
+                    label="📊 Export Structured Workbook (.XLSX)",
+                    data=excel_buffer.getvalue(),
+                    file_name="SmartBench_Allocation_Brief.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
